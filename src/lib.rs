@@ -10,8 +10,45 @@ compile_fatal!("breakpad not yet supported on OS X")
 #[cfg(windows)]
 compile_fatal!("breakpad not yet support on Windows")
 
+pub struct ExceptionHandler {
+    eh: *mut libc::c_void
+}
+
 #[cfg(target_os = "linux")]
-mod ffi {
+impl ExceptionHandler {
+    /// Create a new ExceptionHandler that will write crash dumps into `path`
+    pub fn new(path: &Path) -> ExceptionHandler { unsafe {
+        use std::ptr::{null, mut_null};
+        use std::mem::transmute;
+        let s = path.display().to_string();
+        let desc = s.with_c_str(|cstr| ffi::rust_breakpad_descriptor_new(cstr));
+        let eh = ffi::rust_breakpad_exceptionhandler_new(desc, transmute(null::<()>()),
+                                                         transmute(null::<()>()), mut_null(), 1);
+        ExceptionHandler {
+            eh: eh
+        }
+    } }
+
+    /// Force writing a crash dump.
+    ///
+    /// Should *not* be called after a crash, as this uses the heap.
+    pub fn write_dump(&self) {
+        unsafe {
+            ffi::rust_breakpad_exceptionhandler_write_minidump(self.eh);
+        }
+    }
+}
+
+impl Drop for ExceptionHandler {
+    fn drop(&mut self) {
+        unsafe {
+            ffi::rust_breakpad_exceptionhandler_free(self.eh);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub mod ffi {
     use libc;
 
     pub type FilterCallback = extern fn(context: *mut libc::c_void) -> libc::c_int;
@@ -38,12 +75,19 @@ mod ffi {
     }
 }
 
-pub unsafe fn handle() {
-    use std::ptr::{null, mut_null};
-    use std::mem::transmute;
-
-    let desc = "/tmp".with_c_str(|cstr| ffi::rust_breakpad_descriptor_new(cstr));
-    ffi::rust_breakpad_exceptionhandler_new(
-        desc, transmute(null::<()>()), transmute(null::<()>()), mut_null(), 1
-    );
+/// Catch all task failure with breakpad.
+///
+/// This [installs](http://doc.rust-lang.org/std/rt/unwind/fn.register.html) a global unwinding
+/// callback that will abort the process on task failure. This will trigger a crash dump. Returns
+/// false if it could not install the callback.
+pub fn catch_task_failure() -> bool {
+    fn cb(_: &std::any::Any, _: &'static str, _: uint) {
+        let mut wr = std::io::stdio::stdout_raw();
+        match wr.write(b"Crash detected! Bailing...\n") {
+            Ok(_) => { }
+            Err(_) => { /* not much we can do anyway, we're unwinding */ }
+        }
+        unsafe { std::intrinsics::abort() };
+    }
+    unsafe { std::rt::unwind::register(cb) }
 }
