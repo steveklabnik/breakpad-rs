@@ -1,0 +1,11 @@
+[package]
+
+name = "breakpad_client"
+version = "0.0.1"
+authors = ["Corey Richardson <corey@octayn.net>"]
+
+[dependencies.google-breakpad]
+git = "https://github.com/cmr/google-breakpad"
+
+[dependencies.compile_msg]
+git = "https://github.com/huonw/compile_msg"
