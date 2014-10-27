@@ -15,12 +15,12 @@ pub struct ExceptionHandler {
 impl ExceptionHandler {
     /// Create a new ExceptionHandler that will write crash dumps into `path`
     pub fn new(path: &Path) -> ExceptionHandler { unsafe {
-        use std::ptr::{null, mut_null};
+        use std::ptr::{null, null_mut};
         use std::mem::transmute;
         let s = path.display().to_string();
         let desc = s.with_c_str(|cstr| ffi::rust_breakpad_descriptor_new(cstr));
         let eh = ffi::rust_breakpad_exceptionhandler_new(desc, transmute(null::<()>()),
-                                                         transmute(null::<()>()), mut_null(), 1);
+                                                         transmute(null::<()>()), null_mut(), 1);
         ExceptionHandler {
             eh: eh
         }
@@ -31,12 +31,12 @@ impl ExceptionHandler {
 impl ExceptionHandler {
     /// Create a new ExceptionHandler that will write crash dumps into `path`
     pub fn new(path: &Path) -> ExceptionHandler { unsafe {
-        use std::ptr::{null, mut_null};
+        use std::ptr::{null, null_mut};
         use std::mem::transmute;
         let mut s = path.display().to_string().to_utf16();
         s.push(0); // NUL terminate
         let eh = ffi::rust_breakpad_exceptionhandler_new(s, transmute(null::<()>()),
-                                                         transmute(null::<()>()), mut_null(), 1);
+                                                         transmute(null::<()>()), null_mut(), 1);
         ExceptionHandler {
             eh: eh
         }
